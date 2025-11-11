@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+         http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+<!-- Created by igraph -->
+  <key id="v_name" for="node" attr.name="name" attr.type="string"/>
+  <key id="v_short_name" for="node" attr.name="short_name" attr.type="string"/>
+  <key id="e_weight" for="edge" attr.name="weight" attr.type="double"/>
+  <graph id="G" edgedefault="undirected">
+    <node id="n0">
+      <data key="v_name">Italy</data>
+      <data key="v_short_name">IT</data>
+    </node>
+    <node id="n1">
+      <data key="v_name">Algeria</data>
+      <data key="v_short_name">DZ</data>
+    </node>
+    <node id="n2">
+      <data key="v_name">Spain</data>
+      <data key="v_short_name">ES</data>
+    </node>
+    <node id="n3">
+      <data key="v_name">Belgium</data>
+      <data key="v_short_name">BE</data>
+    </node>
+    <node id="n4">
+      <data key="v_name">France</data>
+      <data key="v_short_name">FR</data>
+    </node>
+    <node id="n5">
+      <data key="v_name">Portugal</data>
+      <data key="v_short_name">PT</data>
+    </node>
+    <node id="n6">
+      <data key="v_name">Slovak Republic</data>
+      <data key="v_short_name">SK</data>
+    </node>
+    <node id="n7">
+      <data key="v_name">Austria</data>
+      <data key="v_short_name">AT</data>
+    </node>
+    <node id="n8">
+      <data key="v_name">Latvia</data>
+      <data key="v_short_name">LV</data>
+    </node>
+    <node id="n9">
+      <data key="v_name">Lithuania</data>
+      <data key="v_short_name">LT</data>
+    </node>
+    <node id="n10">
+      <data key="v_name">Netherlands</data>
+      <data key="v_short_name">NL</data>
+    </node>
+    <node id="n11">
+      <data key="v_name">United Kingdom</data>
+      <data key="v_short_name">UK</data>
+    </node>
+    <node id="n12">
+      <data key="v_name">Ukraine</data>
+      <data key="v_short_name">UA</data>
+    </node>
+    <node id="n13">
+      <data key="v_name">Hungary</data>
+      <data key="v_short_name">HU</data>
+    </node>
+    <node id="n14">
+      <data key="v_name">Switzerland</data>
+      <data key="v_short_name">CH</data>
+    </node>
+    <node id="n15">
+      <data key="v_name">Germany</data>
+      <data key="v_short_name">DE</data>
+    </node>
+    <node id="n16">
+      <data key="v_name">Czech Republic</data>
+      <data key="v_short_name">CZ</data>
+    </node>
+    <node id="n17">
+      <data key="v_name">Poland</data>
+      <data key="v_short_name">PL</data>
+    </node>
+    <node id="n18">
+      <data key="v_name">Luxembourg</data>
+      <data key="v_short_name">LU</data>
+    </node>
+    <node id="n19">
+      <data key="v_name">Romania</data>
+      <data key="v_short_name">RO</data>
+    </node>
+    <node id="n20">
+      <data key="v_name">Iran</data>
+      <data key="v_short_name">IR</data>
+    </node>
+    <node id="n21">
+      <data key="v_name">Turkey</data>
+      <data key="v_short_name">TR</data>
+    </node>
+    <node id="n22">
+      <data key="v_name">Norway</data>
+      <data key="v_short_name">NO</data>
+    </node>
+    <node id="n23">
+      <data key="v_name">Denmark</data>
+      <data key="v_short_name">DK</data>
+    </node>
+    <node id="n24">
+      <data key="v_name">Sweden</data>
+      <data key="v_short_name">SE</data>
+    </node>
+    <node id="n25">
+      <data key="v_name">Croatia</data>
+      <data key="v_short_name">HR</data>
+    </node>
+    <node id="n26">
+      <data key="v_name">Tunisia</data>
+      <data key="v_short_name">TN</data>
+    </node>
+    <node id="n27">
+      <data key="v_name">Libya</data>
+      <data key="v_short_name">LY</data>
+    </node>
+    <node id="n28">
+      <data key="v_name">Slovenia</data>
+      <data key="v_short_name">SI</data>
+    </node>
+    <node id="n29">
+      <data key="v_name">Russia</data>
+      <data key="v_short_name">RU</data>
+    </node>
+    <node id="n30">
+      <data key="v_name">Finland</data>
+      <data key="v_short_name">FI</data>
+    </node>
+    <node id="n31">
+      <data key="v_name">Bulgaria</data>
+      <data key="v_short_name">BG</data>
+    </node>
+    <node id="n32">
+      <data key="v_name">Macedonia. Former Yugoslav Republic</data>
+      <data key="v_short_name">MK</data>
+    </node>
+    <node id="n33">
+      <data key="v_name">Estonia</data>
+      <data key="v_short_name">EE</data>
+    </node>
+    <node id="n34">
+      <data key="v_name">Greece</data>
+      <data key="v_short_name">GR</data>
+    </node>
+    <node id="n35">
+      <data key="v_name">Serbia</data>
+      <data key="v_short_name">RS</data>
+    </node>
+    <node id="n36">
+      <data key="v_name">Belarus</data>
+      <data key="v_short_name">BY</data>
+    </node>
+    <node id="n37">
+      <data key="v_name">Ireland</data>
+      <data key="v_short_name">IE</data>
+    </node>
+    <node id="n38">
+      <data key="v_name">Morocco</data>
+      <data key="v_short_name">MA</data>
+    </node>
+    <node id="n39">
+      <data key="v_name">Georgia</data>
+      <data key="v_short_name">GE</data>
+    </node>
+    <node id="n40">
+      <data key="v_name">Moldova</data>
+      <data key="v_short_name">MD</data>
+    </node>
+    <edge source="n1" target="n2">
+      <data key="e_weight">0.93</data>
+    </edge>
+    <edge source="n2" target="n4">
+      <data key="e_weight">2.87762962962963</data>
+    </edge>
+    <edge source="n3" target="n4">
+      <data key="e_weight">6.76762962962963</data>
+    </edge>
+    <edge source="n2" target="n5">
+      <data key="e_weight">0.94</data>
+    </edge>
+    <edge source="n0" target="n7">
+      <data key="e_weight">5.37</data>
+    </edge>
+    <edge source="n6" target="n7">
+      <data key="e_weight">7.52881481481481</data>
+    </edge>
+    <edge source="n8" target="n9">
+      <data key="e_weight">1.78881481481481</data>
+    </edge>
+    <edge source="n3" target="n10">
+      <data key="e_weight">7.10525925925926</data>
+    </edge>
+    <edge source="n3" target="n11">
+      <data key="e_weight">5.37</data>
+    </edge>
+    <edge source="n10" target="n11">
+      <data key="e_weight">4.03881481481482</data>
+    </edge>
+    <edge source="n6" target="n12">
+      <data key="e_weight">10.12</data>
+    </edge>
+    <edge source="n6" target="n13">
+      <data key="e_weight">2.51762962962963</data>
+    </edge>
+    <edge source="n7" target="n13">
+      <data key="e_weight">1.73881481481481</data>
+    </edge>
+    <edge source="n12" target="n13">
+      <data key="e_weight">3.05</data>
+    </edge>
+    <edge source="n0" target="n14">
+      <data key="e_weight">3.70881481481482</data>
+    </edge>
+    <edge source="n4" target="n14">
+      <data key="e_weight">3.09881481481481</data>
+    </edge>
+    <edge source="n7" target="n14">
+      <data key="e_weight">0.37</data>
+    </edge>
+    <edge source="n3" target="n15">
+      <data key="e_weight">6.40762962962963</data>
+    </edge>
+    <edge source="n4" target="n15">
+      <data key="e_weight">1.6</data>
+    </edge>
+    <edge source="n7" target="n15">
+      <data key="e_weight">2.83</data>
+    </edge>
+    <edge source="n10" target="n15">
+      <data key="e_weight">16.6345925925926</data>
+    </edge>
+    <edge source="n14" target="n15">
+      <data key="e_weight">2.24</data>
+    </edge>
+    <edge source="n6" target="n16">
+      <data key="e_weight">9.4</data>
+    </edge>
+    <edge source="n7" target="n16">
+      <data key="e_weight">0.5</data>
+    </edge>
+    <edge source="n15" target="n16">
+      <data key="e_weight">18.12</data>
+    </edge>
+    <edge source="n12" target="n17">
+      <data key="e_weight">0.71</data>
+    </edge>
+    <edge source="n15" target="n17">
+      <data key="e_weight">4.2</data>
+    </edge>
+    <edge source="n16" target="n17">
+      <data key="e_weight">2.62762962962963</data>
+    </edge>
+    <edge source="n3" target="n18">
+      <data key="e_weight">0.25</data>
+    </edge>
+    <edge source="n15" target="n18">
+      <data key="e_weight">0.19</data>
+    </edge>
+    <edge source="n12" target="n19">
+      <data key="e_weight">4.38</data>
+    </edge>
+    <edge source="n13" target="n19">
+      <data key="e_weight">0.4</data>
+    </edge>
+    <edge source="n20" target="n21">
+      <data key="e_weight">1.25881481481481</data>
+    </edge>
+    <edge source="n3" target="n22">
+      <data key="e_weight">2.74</data>
+    </edge>
+    <edge source="n4" target="n22">
+      <data key="e_weight">2.23</data>
+    </edge>
+    <edge source="n10" target="n22">
+      <data key="e_weight">5.03525925925926</data>
+    </edge>
+    <edge source="n11" target="n22">
+      <data key="e_weight">7.47881481481482</data>
+    </edge>
+    <edge source="n15" target="n22">
+      <data key="e_weight">4.53</data>
+    </edge>
+    <edge source="n10" target="n23">
+      <data key="e_weight">1.25881481481481</data>
+    </edge>
+    <edge source="n15" target="n23">
+      <data key="e_weight">0.18</data>
+    </edge>
+    <edge source="n22" target="n23">
+      <data key="e_weight">1.25881481481481</data>
+    </edge>
+    <edge source="n23" target="n24">
+      <data key="e_weight">0.36</data>
+    </edge>
+    <edge source="n0" target="n25">
+      <data key="e_weight">0.67</data>
+    </edge>
+    <edge source="n13" target="n25">
+      <data key="e_weight">0.3</data>
+    </edge>
+    <edge source="n0" target="n26">
+      <data key="e_weight">4.4</data>
+    </edge>
+    <edge source="n1" target="n26">
+      <data key="e_weight">4.03</data>
+    </edge>
+    <edge source="n0" target="n27">
+      <data key="e_weight">1.46</data>
+    </edge>
+    <edge source="n0" target="n28">
+      <data key="e_weight">0.38</data>
+    </edge>
+    <edge source="n7" target="n28">
+      <data key="e_weight">0.28</data>
+    </edge>
+    <edge source="n25" target="n28">
+      <data key="e_weight">0.2</data>
+    </edge>
+    <edge source="n8" target="n29">
+      <data key="e_weight">1.58</data>
+    </edge>
+    <edge source="n9" target="n29">
+      <data key="e_weight">0.44</data>
+    </edge>
+    <edge source="n15" target="n29">
+      <data key="e_weight">6.67</data>
+    </edge>
+    <edge source="n21" target="n29">
+      <data key="e_weight">1.25881481481481</data>
+    </edge>
+    <edge source="n29" target="n30">
+      <data key="e_weight">0.8</data>
+    </edge>
+    <edge source="n19" target="n31">
+      <data key="e_weight">3.26</data>
+    </edge>
+    <edge source="n21" target="n31">
+      <data key="e_weight">1.85</data>
+    </edge>
+    <edge source="n31" target="n32">
+      <data key="e_weight">0.11</data>
+    </edge>
+    <edge source="n8" target="n33">
+      <data key="e_weight">1.54881481481481</data>
+    </edge>
+    <edge source="n29" target="n33">
+      <data key="e_weight">0.3</data>
+    </edge>
+    <edge source="n21" target="n34">
+      <data key="e_weight">0.19</data>
+    </edge>
+    <edge source="n31" target="n34">
+      <data key="e_weight">0.42</data>
+    </edge>
+    <edge source="n13" target="n35">
+      <data key="e_weight">0.55</data>
+    </edge>
+    <edge source="n9" target="n36">
+      <data key="e_weight">1.46</data>
+    </edge>
+    <edge source="n17" target="n36">
+      <data key="e_weight">4.75</data>
+    </edge>
+    <edge source="n11" target="n37">
+      <data key="e_weight">1.24</data>
+    </edge>
+    <edge source="n2" target="n38">
+      <data key="e_weight">1.57</data>
+    </edge>
+    <edge source="n21" target="n39">
+      <data key="e_weight">1.25881481481481</data>
+    </edge>
+    <edge source="n19" target="n40">
+      <data key="e_weight">1.25881481481481</data>
+    </edge>
+  </graph>
+</graphml>
