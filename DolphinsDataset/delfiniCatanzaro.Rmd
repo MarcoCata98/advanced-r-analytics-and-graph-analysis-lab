@@ -1,0 +1,563 @@
+---
+title: "Relazione tra coppie di Delfini"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduzione
+
+Un ricercatore ha osservato un gruppo di delfini dal **1995** al **2001**.  
+I singoli individui sono stati **identificati** e **registrati**.  
+Tramite GPS è stato possibile osservare per quanto tempo le **coppie** di delfini nuotavano insieme.
+
+# Obiettivo
+
+L’obiettivo è stabilire se possa esistere un **legame affettivo**, come un rapporto di amicizia o di amore, tra due delfini.
+
+
+```{r include=FALSE}
+
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(scales)
+library(corrplot)
+
+
+
+```
+
+# Delfini identificati
+I singoli delfini sono raccolti in un dataset , con il proprio sesso assegnato
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+dolphin_nodes <- read_csv("dolphin_nodes.csv")
+dolphin_links <- read_csv("dolphin_edges.csv")
+
+nodi = dolphin_nodes
+link = dolphin_links
+
+head(nodi)
+
+```
+
+
+Il numero di individui identificati
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+nodi %>%
+  group_by(sex) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = sex, y = n, fill = sex)) +
+  geom_col() +
+  geom_text(aes(label = n), 
+            vjust = -0.5,      # sposta il testo sopra la barra
+            size = 5) +        # grandezza del testo
+  scale_fill_manual(values = c("F" = "pink", 
+                               "M" = "skyblue", 
+                               "U" = "grey70")) +
+  labs(x = "Sesso", y = "Numero individui") +
+  theme_minimal()
+
+
+
+```
+
+# Relazioni identificate
+In base al tempo di nuoto insieme
+
+
+```{r, message=FALSE, warning=FALSE}
+
+# CODICE CREAZIONE GRAFO
+
+nodes = nodi
+edges = link
+
+# Creazione del grafo
+# il grafo è rappresentato da 2 dataframes  Node_Data  e  Edge_Data
+dolphin = tbl_graph(nodes = nodes, edges = edges, directed = FALSE)
+
+#-----------------------------------------------------------------------------
+
+# CODICE MANIPOLARE IL GRAFO
+
+g <- dolphin %>%
+  activate(nodes) %>%
+  
+  # aggiungo informazioni interente al grado, come il nome o la centralità
+  mutate(
+    degree = centrality_degree(),
+    label  = ifelse(degree <= 2, name, ""),
+  ) %>%
+  arrange(degree) 
+
+
+# CODICE DISEGNARE IL GRAFO
+
+ggraph(g) + 
+  geom_edge_link(alpha = 0.25, width = 0.5, colour = "grey60") +
+  
+  # controllo la dimensione = grado, e il colore con il sesso
+  geom_node_point(aes(size = degree, fill = sex), shape = 21, stroke = 0.4) +          # shape > 21 , la riempio con fill, stroke è il bordo
+  scale_size_continuous(range = c(1.2, 5), guide = "none") +                          # definisco il max e il min del size, tolgo la legenda
+  scale_fill_manual(values = c(F = "pink", M = "skyblue", U = "grey70"), name = "Sesso") +   # definisco i colori per il fill
+  
+  geom_node_text(aes(label = label), repel = TRUE, size = 4, vjust = 1) +         # Aggiungo le etichette, ai nomi con basso degree
+  
+  
+  theme_graph(background = "white") +                   
+  labs(title = "Rete dei delfini",
+       subtitle = "Dimensione = grado ,   colore = sesso")
+
+
+```
+
+Nel grafo ho rappresentato con i colori il sesso del delfino,  
+mentre con la dimensione la **degree centrality**,
+in quanto è la centralità che definisce meglio il nostro problema,
+cioè quanti amici o amanti hanno i delfini.  
+  
+  
+# 1. Quali relazioni sono di amicizia e quali di amore?
+
+Provo a stimare quali link sono relazioni amorose  
+  
+le relazioni amorose sono generalmente meno rare di quelle di amicizia  
+considero solo le relazioni monogame  
+e quelle eterosessuali, essendo più frequenti  
+
+```{r, message=FALSE, warning=FALSE}
+
+# Estraggo il sottografo delle relazioni tra maschio-femmina
+
+# aggiungo un attributo ai link che mi dicono se il link viene da maschio a femmina (o viceversa)
+
+g_MF <- dolphin %>%
+  activate(edges) %>%
+  mutate(
+    is_MF = .N()$sex[from] != .N()$sex[to]  # TRUE SE IL SESSO DI PARTENZA E' != DA QUELLO DI ARRIVO
+ ) %>%
+  
+  filter(is_MF) %>%                         # elimino gli archi con is_MF = FALSE
+  
+  convert(to_subgraph) %>%                  # ottengo il sottografo
+  
+  # ci saranno dei nodi che non vengono presi, perchè avevano solo link con unità dello stesso sesso
+  activate(nodes) %>%
+  filter(!node_is_isolated())               # li elimino
+
+
+
+  # CODICE PER DISEGNARE IL GRAFO
+
+ggraph(g_MF) +
+  geom_edge_link(colour = "red", alpha = 0.4) +
+  geom_node_point(aes(fill = sex), shape = 21, size = 6,colour = "black", stroke = 0.6) +
+  scale_fill_manual(values = c(F = "pink", M = "skyblue", U = "grey70")) +
+  
+  
+  theme_graph() +
+  labs(title = "Sottografo dei soli legami Maschio–Femmina")
+
+
+```
+
+quindi, le relazioni amorose, faranno parte di questo gruppo di link  
+non si può sapere con esattezza, bisognerebbe studiare altri parametri delle relazioni sociali dei delfini.
+  
+Per esempio, avere **pochi contantti** con altri delfini dello **stesso sesso**, aumenta le probabilità che quella sia una relazione amorosa  
+  
+# 2. Calcolo delle centralità principali
+
+```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=9, fig.align='center'}
+
+# AGGIUNGO LE CENTRALITA' COME ATTRIBUTI DEI VARI NODI
+
+  g <- dolphin %>%
+    activate(nodes) %>%
+    mutate(
+      degree      = centrality_degree(),
+      closeness   = centrality_closeness(),
+      betweenness = centrality_betweenness(),
+      pagerank    = centrality_pagerank()
+    )
+  
+
+# CREO I GRAFI PER OGNI CENTRALITA'
+# ogni grafo utilizza la size del nodo per rappresentare la centralità di esso
+
+# estraggo solo un sottografo dei primi k nodi per centralità, in modo sia più leggibile
+K <- 15
+
+# etichetto solo con i nomi dei primi s elementi
+s <- 5
+
+
+## -------------------- DEGREE --------------------
+# Estraggo i primi k nodi per centralità
+g_deg <- g %>%
+  activate(nodes) %>%
+  arrange(desc(degree)) %>%
+  slice_head(n = K) %>%      # taglia i primi k
+  convert(to_subgraph)
+
+# Genero il grafico
+p_deg <- ggraph(g_deg, layout = "kk") +
+  
+  geom_edge_link(alpha = 0.35, colour = "grey75", width = 0.4) +
+  geom_node_point(aes(fill = sex, size = degree), shape = 21, colour = "black", stroke = 0.35) +
+  
+  geom_node_text(aes(label = ifelse(rank(-degree) <= s, name, "")),size = 3, repel = TRUE, vjust = -0.6) +
+  
+  scale_fill_manual(values = c(F="pink", M="skyblue", U="grey70"),name = "Sesso") +
+  scale_size_continuous(range = c(2,6), guide = "none") +
+  
+  
+  labs(title = "Degree") +
+  theme_graph() +
+  theme(plot.title = element_text(face="bold", size=12), legend.position="none")
+
+## -------------------- CLOSENESS --------------------
+# Estraggo i primi k nodi per centralità
+g_clo <- g %>%
+  activate(nodes) %>%
+  arrange(desc(closeness)) %>%
+  slice_head(n = K) %>%     # taglia i primi k
+  convert(to_subgraph)
+
+# Genero il grafico
+p_clo <- ggraph(g_clo, layout = "kk") +
+  geom_edge_link(alpha = 0.35, colour = "grey75", width = 0.4) +         
+  geom_node_point(aes(fill = sex, size = closeness), shape = 21, colour = "black", stroke = 0.35) +
+  
+  geom_node_text(aes(label = ifelse(rank(-closeness) <= s, name, "")),size = 3, repel = TRUE, vjust = -0.6) +
+  
+  scale_fill_manual(values = c(F="pink", M="skyblue", U="grey70"),name = "Sesso") +
+  scale_size_continuous(range = c(2,6), guide = "none") +
+  
+  
+  labs(title = "Closeness") +
+  theme_graph() +
+  theme(plot.title = element_text(face="bold", size=12), legend.position="none")
+
+## -------------------- BETWEENNESS --------------------
+# Estraggo i primi k nodi per centralità
+g_bet <- g %>%
+  activate(nodes) %>%
+  arrange(desc(betweenness)) %>%
+  slice_head(n = K) %>%      # taglia i primi k
+  convert(to_subgraph)
+
+# Genero il grafico
+p_bet <- ggraph(g_bet, layout = "kk") +
+  geom_edge_link(alpha = 0.35, colour = "grey75", width = 0.4) +
+  geom_node_point(aes(fill = sex, size = betweenness),shape = 21, colour = "black", stroke = 0.35) +
+  
+  geom_node_text(aes(label = ifelse(rank(-betweenness) <= s, name, "")),size = 3, repel = TRUE, vjust = -0.6) +
+  
+  scale_fill_manual(values = c(F="pink", M="skyblue", U="grey70"),name = "Sesso") +
+  scale_size_continuous(range = c(2,6), guide = "none") +
+  
+  labs(title = "Betweenness") +
+  theme_graph() +
+  theme(plot.title = element_text(face="bold", size=12), legend.position="none")
+
+## -------------------- PAGERANK --------------------
+# Estraggo i primi k nodi per centralità
+g_pr <- g %>%
+  activate(nodes) %>%
+  arrange(desc(pagerank)) %>%
+  slice_head(n = K) %>%      # taglia i primi k
+  convert(to_subgraph)
+
+# Genero il grafico
+p_pr <- ggraph(g_pr, layout = "kk") +
+  geom_edge_link(alpha = 0.35, colour = "grey75", width = 0.4) +
+  geom_node_point(aes(fill = sex, size = pagerank), shape = 21, colour = "black", stroke = 0.35) +
+ 
+   geom_node_text(aes(label = ifelse(rank(-pagerank) <= s, name, "")),size = 3, repel = TRUE, vjust = -0.6) +
+  
+  scale_fill_manual(values = c(F="pink", M="skyblue", U="grey70"),name = "Sesso") +
+  scale_size_continuous(range = c(2,6), guide = "none") +
+  
+  labs(title = "PageRank") +
+  theme_graph() +
+  theme(plot.title = element_text(face="bold", size=12),legend.position="none")
+
+#------------------------------------------------------------------------------------------
+
+
+# 4 pannelli
+gridExtra::grid.arrange(
+  p_deg, p_clo,
+  p_bet, p_pr,
+  ncol = 2
+)
+
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# DA RIVEDERE
+
+top5_wide <- as_tibble(g, active = "nodes") %>%
+  select(name, sex, degree, closeness, betweenness, pagerank) %>%
+  
+  pivot_longer(-c(name, sex), names_to = "metric", values_to = "value") %>%
+  group_by(metric) %>%
+  arrange(desc(value), .by_group = TRUE) %>%
+  mutate(Rank = row_number()) %>%
+  slice_head(n = 5) %>%
+  ungroup() %>%
+  
+  # etichetta TRIPLA: Nome - Sesso - Valore
+  mutate(label = paste0(name, " (", sex, ") — ", round(value, 4))) %>%
+  
+  # metrica con nomi belli
+  mutate(metric = factor(metric,
+                         levels = c("degree","closeness","betweenness","pagerank"),
+                         labels = c("Degree","Closeness","Betweenness","PageRank"))) %>%
+  
+  select(Rank, metric, label) %>%
+  pivot_wider(names_from = metric, values_from = label) %>%
+  arrange(Rank)
+
+knitr::kable(
+  top5_wide,
+  caption = "Top-5 nodi per ciascuna metrica (Nome — Sesso — Valore)",
+  align = c("c","l","l","l","l")
+)
+
+
+```
+  
+  
+Notiamo che le femmine sono molto più presenti dei maschi tra le prime posizioni, sopratutto nella closeness
+
+Verifichiamo se ciò accade a livello globale, **con la media le centralità per ogni sottogruppo**  
+
+  
+  
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Media (non somma) delle centralità normalizzate per metrica e sesso
+centrality_mean_norm <- as_tibble(g, active = "nodes") %>%
+  select(name, sex, degree, closeness, betweenness, pagerank) %>%
+  pivot_longer(
+    cols = c(degree, closeness, betweenness, pagerank),
+    names_to = "metric", values_to = "value"
+  ) %>%
+  group_by(metric) %>%
+  mutate(value_norm = (value - min(value)) / (max(value) - min(value))) %>%
+  ungroup() %>%
+  filter(sex %in% c("M","F")) %>%
+  group_by(metric, sex) %>%
+  summarise(
+    n = dplyr::n(),
+    mean_value = mean(value_norm, na.rm = TRUE),
+    sd_value   = sd(value_norm,   na.rm = TRUE),
+    se = sd_value / sqrt(n),
+    ci_low  = mean_value - 1.96 * se,
+    ci_high = mean_value + 1.96 * se,
+    .groups = "drop"
+  ) %>%
+  mutate(metric = factor(metric,
+    levels = c("degree","closeness","betweenness","pagerank"),
+    labels = c("Degree","Closeness","Betweenness","PageRank"))
+  )
+
+# Grafico: medie con barre d'errore
+ggplot(centrality_mean_norm, aes(x = metric, y = mean_value, fill = sex)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.7, colour = "black") +
+  scale_fill_manual(values = c(F = "pink", M = "skyblue"), name = "Sesso") +
+  labs(
+    title = "Media delle centralità normalizzate per sesso",
+    x = "Centralità",
+    y = "Media (Norm)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold", size = 16))
+
+
+```
+
+  
+  
+Dopo aver **normalizzato MIN-MAX**, visto che le varie centralità hanno valori molto diversi   
+Le femmine anche a livello globable superano i maschi per centralità
+
+**Questo dimostra che le femmine sono dominanti e creano relazioni nel gruppo**  
+**e non è solo un fenomeno isolato di pochi individui, ma vale in tutto il branco**
+
+
+
+```{r, message=FALSE, warning=FALSE}
+
+# Andamento rank-closeness individui di sesso = femmina
+
+
+# metto in un dataframe i nodi con i loro attributi
+nodes_df <- as.data.frame(g %>% activate("nodes") %>% data.frame())
+
+# estraggo solo le femmine, e prendo solo la colonna della closeness e ne estraggo il rank
+fem_df <- nodes_df %>%
+          filter(sex == "F") %>%
+          select(c("name","sex","closeness")) %>%
+          arrange(desc(closeness)) %>%
+          mutate(rank = row_number())
+
+# estraggo i primi 5 per mettere i nomi nel etichetta
+top5F <- fem_df %>% slice_head(n = 5)
+
+
+# Disegno il grafico
+
+ggplot(fem_df, aes(x = rank, y = closeness)) +
+  geom_point(size = 2, alpha = 0.9, size = 2.8, stroke = 1, colour = "pink") +   # scatterplot
+  
+  geom_smooth(method = "loess", se = FALSE, span = 0.8, colour = "grey40") +  
+  # loess = fa una mini regressione locale punto per punto
+ 
+  # metto le etichette dei primi 5 punti
+  ggrepel::geom_text_repel(
+    data = top5F,
+    aes(label = name),
+    angle = 90,              
+    direction = "y",         
+    nudge_y = 0.0002,        
+    box.padding = 0.25,
+    point.padding = 0.3,
+    min.segment.length = 0,
+    size = 3
+  ) +
+  
+  labs(
+    title = "Distribuzione della Closeness (solo femmine)",
+    x = "Rank ",
+    y = "Closeness"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(face = "bold"))
+
+
+```
+  
+  
+  Infatti la distribuzione del rank , **NON MOSTRA UNA POWERLAW** ma una semplice discesa lineare  
+  
+  
+# 3. Analisi della correlazione tra le centralità
+Per ogni coppia di centralità, verificare se hanno un trend simile
+(per esempio, se un nodo ha pagerank alto, signifca che avrà anche closeness alta...)
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Creo la matrice delle correlazioni
+centrality_df <- as_tibble(g, active = "nodes") %>%
+  select(degree, closeness, betweenness, pagerank)
+
+corr_mat <- cor(centrality_df)
+
+# Palette: blu -> celeste -> rosa -> rosso
+# Disegnata apposta per far diventare rosso già a 0.6-0.7
+my_col <- colorRampPalette(
+  c("#2166ac", "#67a9cf", "#d1e5f0", "#fddbc7", "#ef8a62", "#b2182b")
+)(200)
+
+# Plot
+corrplot(
+  corr_mat,
+  method = "color",
+  col = my_col,
+  addCoef.col = "black",
+  number.cex = 0.9,
+  tl.col = "black",
+  tl.cex = 1.1,
+  tl.srt = 45,
+  cl.ratio = 0.2
+)
+
+
+```
+
+
+ Otteniamo un che **pageRank** e **degree** hanno una correlazione molto alta
+ 
+ **Confrontiamo le distribuzioni**
+ 
+ 
+```{r,  message=FALSE, warning=FALSE}
+
+# Estraggo le distribuzioni di Degree Centrality e PageRank
+
+
+df <- as.data.frame(g %>% activate("nodes") %>% data.frame())
+df <- df %>% select(name, degree, pagerank)
+
+# metto degree e pageRank in un unica variabile (è comodo per fare i grafici)
+long <- df %>%
+  pivot_longer(c(degree, pagerank), names_to = "metric", values_to = "value") %>%
+  mutate(metric = factor(metric, levels = c("degree","pagerank"), labels = c("Degree","PageRank")))
+
+# estraggo la media per degree e pagerank
+means <- long %>% group_by(metric) %>% summarise(m = mean(value), .groups = "drop")
+
+#----------------------------------------------------------------------------------------------------------
+
+
+# Disegno le distribuzioni
+
+p_dens <- ggplot(long, aes(x = value, fill = metric)) +   # 
+  geom_density(alpha = 0.6, colour = NA) +   
+  
+  facet_wrap(~ metric, scales = "free", ncol = 2) +                          # crea 2 grafici separati per metrica (ognuno con la sua scala)
+  geom_vline(data = means, aes(xintercept = m), linetype = "dashed") +         # linea tratteggiata verticale sulla media
+  scale_fill_manual(values = c("Degree" = "skyblue", "PageRank" = "pink")) +    # coloro in base ai valori della metrica
+  
+  
+  
+  labs(title = "Distribuzioni di Degree e PageRank", x = NULL, y = "Densità") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none",  strip.text = element_text(face = "bold"))
+
+
+
+# NORMALIZZO LE DISTRIBUZIONI MIN-MAX (cosi posso confrontare direttamente le scale)
+long_norm <- long %>%
+  group_by(metric) %>%
+  mutate(value_norm = (value - min(value)) / (max(value) - min(value))) %>%
+  ungroup()
+
+ 
+# Disegno le distribuzioni di ripartizione
+
+p_ecdf <- ggplot(long_norm, aes(x = value_norm, colour = metric)) +
+         stat_ecdf(size = 1.1) +                                          # disegna la funzione di ripartizione
+ 
+  
+   scale_colour_manual(values = c("Degree" = "skyblue4", "PageRank" = "deeppink")) +  # in base alla metrica, cambio colore
+  
+  
+  labs(title = "Funzione di ripartizione (Norm)", x = "% andamento", y = "F(x)") +
+  theme_minimal(base_size = 13) +
+  theme(legend.title = element_blank(),legend.position = "top")
+
+
+
+# Metto i grafici uno sotto l'altro
+gridExtra::grid.arrange(p_dens, p_ecdf, ncol = 1)
+
+```
+ 
+   
+     
+ 
+ **Significa che se un delfino ha molti amici e questi amici sono anche vicini importanti**  
+ **non ci sono grossi hub principali, ma i link sono ben distribuiti nella componente connessa principale**
