@@ -43,6 +43,14 @@ Exploration of a large-scale **infrastructure graph**:
 - power metrics (Bonacich power, β-power)  
 - multi-layer visual styles with `ggraph`  
 
+### 📚 Citation Flow Between Scientific Disciplines (Network Science)
+
+Analysis of a directed weighted network describing citation flows across 30 scientific disciplines.  
+The project includes construction of the flow network, visualization of major citation patterns, and identification of self-citing, most-cited, and most-citing fields.  
+Advanced normalization techniques (expected flow, F/E ratio, X-test) and Rao quadratic entropy are used to highlight interdisciplinary disciplines.  
+A complete workflow combining network construction, metrics, statistical tests, and interpretable visualizations.
+
+
 ---
 
 ## 📊 Exploratory Data Analysis (EDA) & Statistics
