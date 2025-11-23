@@ -1,0 +1,631 @@
+---
+title: "ProgettoAttantatiCatanzaro"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduzione
+
+L’Università di Barcellona, ha creato una rete con i collegamenti fra gli individui coinvolti negli attentati ai treni pendolari a Madrid 11 marzo 2004. (fonti El Pais e El Mundo, giornali spagnoli)  
+
+I nodi sono i possibili attentatori o persone che hanno aiutato nella preparazione del attentato (**individui coinvolti**),  
+il legame può essere di diverso tipo :  
+- fiducia amicizia   
+- legami con Al Quaeda e Osama Bin Laden  
+- Co-partecipazione in campi di addestramento/guerre  
+- Co-partecipazione in altri attacchi terroristici    
+**Grafo indiretto**, i legami valgono in entrambe le direzioni  
+  
+  
+Il **peso dell arco** corrisponde alla forza del legame da 1 a 4.
+
+
+
+```{r include=FALSE}
+
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(scales)
+library(corrplot)
+
+
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+nodes <- read_csv("nodes.csv", show_col_types = FALSE)
+ties  <- read_csv("ties.csv",  show_col_types = FALSE)
+
+
+# Se la colonna dei nodi si chiama "id" e in ties "from"/"to" contengono gli stessi ID:
+g <- tbl_graph(
+  nodes   = nodes,
+  edges   = ties,
+  directed = FALSE,
+  node_key = "id"   # chiave che collega edges$from / edges$to a nodes$id
+)
+
+#g
+
+
+# MOSTRARE I DF DEI NODI E DEGLI ARCHI
+
+g %>% activate(nodes) %>% as_tibble() %>% head()
+g %>% activate(edges) %>% as_tibble() %>% head()
+
+
+
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=9, fig.align='center'}
+
+set.seed(123)
+options(repr.plot.width = 14, repr.plot.height = 10)
+
+# 1) Tieni solo i nodi con almeno un arco (niente isolati)
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(deg = centrality_degree()) %>%
+  filter(deg > 0)          # rimuove i completamente isolati
+
+# 2) Visualizzazione del componente principale, molto più espanso
+g_main %>%
+  ggraph(layout = "kk") +  # Kamada–Kawai: ben “spalmato”
+  
+  # Archi colorati per intensità del legame
+  geom_edge_link(
+    aes(
+      colour = weight,
+      alpha  = rescale(weight)
+    ),
+    width       = 0.9,
+    show.legend = TRUE
+  ) +
+  scale_edge_colour_gradient(
+    low  = "grey80",
+    high = "red3",
+    name = "Tie strength"
+  ) +
+  scale_edge_alpha(range = c(0.30, 0.90), guide = "none") +
+  
+  # Nodi
+  geom_node_point(size = 3, colour = "black") +
+  
+  # Etichette
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+  
+  theme_graph() +
+  ggtitle("Rete persone coinvolte negli attentati")
+
+```
+
+Si notano una serie di nodi più isolati, e un **gruppo centrale molto più unito**  
+  
+  
+Si intravedono anche che ci sono tra i nodi isolati, gruppi più connessi tra loro rispetto ad altro, dei **possibili cluster**
+  
+  
+# 1. similarità tra le coppie di terroristi 
+
+**Due nodi sono simili, più condividono gli stessi vicini**, in quanto condividono interessi simili, oppure hanno rapporti con le stesse persone (nostro caso).  
+  
+Di **similarità locale** (tra 2 nodi) esistono diversi modi (molto simili) per calcolarla, i principali sono :   
+
+### Similarità coseno
+
+La similarità coseno tra due nodi \(i\) e \(j\) è definita come:
+
+\[
+\text{cos}(i,j)
+=
+\frac{\mathbf A_i \cdot \mathbf A_j}{\|\mathbf A_i\|\; \|\mathbf A_j\|}
+=
+\frac{\sum_k A_{ik} A_{kj}}
+{\sqrt{\sum_k A_{ik}^2}\;\sqrt{\sum_k A_{jk}^2}}
+\]
+
+dove:
+
+- \(\mathbf A_i\) è la riga \(i\)-esima della matrice di adiacenza \(A\)  
+- \(\mathbf A_j\) è la riga \(j\)-esima della matrice di adiacenza \(A\)  
+- \(\|\mathbf A_i\|\) è la norma euclidea del vettore \(\mathbf A_i\)
+
+Questa formula calcola il **coseno dell’angolo** tra i vettori \(i\) e \(j\).  
+Il valore:
+
+- si avvicina a **1** se i due vettori sono quasi identici  
+- è vicino a **0** se sono indipendenti (ortogonali)  
+- tende a **-1** se puntano in direzioni opposte
+
+Quindi, più i due vettori vanno “nella stessa direzione”, più l’angolo tra loro è piccolo, il coseno si avvicina a 1 e i due nodi risultano **molto simili**.  
+Nel prodotto \(\mathbf A_i \cdot \mathbf A_j\) otteniamo contributi positivi (+1) quando entrambi i nodi hanno un link verso lo stesso vicino \(k\) (cioè \(A_{ik}=1\) e \(A_{jk}=1\)), **aumentando così la similarità**.
+
+---
+
+### Similarità di Pearson
+
+La similarità di Pearson tra due nodi \(i\) e \(j\) è definita come:
+
+\[
+\text{pear}(i,j)
+=
+\frac{\operatorname{cov}(\mathbf A_i, \mathbf A_j)}
+{\operatorname{SD}(\mathbf A_i)\; \operatorname{SD}(\mathbf A_j)}
+=
+\frac{
+\sum_k (A_{ik} - \bar A_i)(A_{jk} - \bar A_j)
+}{
+\sqrt{\sum_k (A_{ik} - \bar A_i)^2}
+\;\sqrt{\sum_k (A_{jk} - \bar A_j)^2}
+}
+\]
+
+dove:
+
+- \(\operatorname{cov}(\mathbf A_i, \mathbf A_j)\) è la **covarianza** fra i due vettori  
+- \(\operatorname{SD}(\mathbf A_i)\) è la **deviazione standard** di \(\mathbf A_i\)  
+- \(\bar A_i\) è la **media** degli elementi di \(\mathbf A_i\)
+
+Questa formula è il **coefficiente di correlazione di Pearson**, che misura la **correlazione lineare** tra due vettori: indica quanto le due variabili tendono a crescere o decrescere insieme in modo lineare.  
+(Nel nostro caso, crescere assieme significa avere un arco 1 nello stesso vicino)
+
+Il valore di \(\text{pear}(i,j)\) varia in \([-1, 1]\) :  
+
+ 
+- **1** indica correlazione lineare positiva massima (i due nodi hanno pattern di connessione molto simili)  
+- **0** indica assenza di correlazione lineare  
+- **-1** indica correlazione lineare negativa massima (quando uno “è connesso”, l’altro tende a non esserlo, e viceversa)
+
+
+## Calcolo la similarità coseno tra tutte le coppie di nodi
+
+```{r, message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+
+
+# CALCOLO LA MATRICE DI SIMILARITA'
+
+g_ig <- as.igraph(g)
+
+
+# Calcola la matrice di siminalità
+
+cosine_similarity_mat <- function(g, mode = "col") {
+  A <- as_adjacency_matrix(g, sparse = FALSE)  # matrice di adiacenza piena
+  
+  if (mode == "row") {
+    A <- t(A)
+  }
+  
+  euclidean <- function(x) sqrt(drop(x %*% x)) # NORMA EUCLIDEA = somma elementi xi^2 del vettore x, e radice quadrata
+  
+ 
+  d <- apply(A, 2, euclidean)               # calcola la norma per ogni vettore colonna colonna, d vettore delle norme
+  d[d == 0] <- 1   
+  
+  D <- diag(1 / d)
+  
+ # S = Matrice di similarità  Sij, è la similarità coseno sim(i,j)  - ovviamente simmetrica
+  S <- D %*% t(A) %*% A %*% D
+  
+  node_names <- V(g)$name
+  rownames(S) <- node_names
+  colnames(S) <- node_names
+  
+  S
+}
+
+# S_cos(i,j) = similarità coseno tra il nodo i e il nodo j 
+
+S_cos <- cosine_similarity_mat(g_ig, mode = "col")
+
+# VISUALIZZO SOLO I PRIMI 10, TOGLIENDO RIPETIZIONI DEI NODI
+# altrimenti i colori si sovrappongono nella visualizzazione
+
+
+```
+
+
+```{r echo=FALSE}
+
+#------------------------------------------------------------------------
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+
+
+# Estaggo la lista delle coppie con la loro similarità
+
+cos_pairs <- as.data.frame(S_cos) %>%
+  tibble::rownames_to_column("node_i") %>%
+  pivot_longer(
+    cols      = -node_i,
+    names_to  = "node_j",
+    values_to = "cosine"
+  ) %>%
+  filter(node_i < node_j) %>%      
+  arrange(desc(cosine))
+
+
+# MOSTRO I PRIMI 10 DELLA LISTA
+# Elimino per leggibilità nodi ripetuti, altrimenti i colori si sovrappongono
+
+top10_unique_pairs <- {
+  used_nodes <- character(0)
+  res <- vector("list", 0)
+  
+  for (i in seq_len(nrow(cos_pairs))) {
+    row <- cos_pairs[i, ]
+    ni <- row$node_i
+    nj <- row$node_j
+    
+    if (!(ni %in% used_nodes) && !(nj %in% used_nodes)) {
+      res[[length(res) + 1]] <- row
+      used_nodes <- c(used_nodes, ni, nj)
+    }
+    
+    if (length(res) == 10) break
+  }
+  
+  bind_rows(res)
+}
+
+top10_unique_pairs
+
+# PER AVERE VALORI DISTINTI NON RIPETO UN NODO SE ERA GIA NELLA COPPIA PRECEDENTE
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=9, fig.align='center'}
+
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(scales)
+
+set.seed(123)
+options(repr.plot.width = 14, repr.plot.height = 10)
+
+# 0) Uso le 10 coppie senza nodi ripetuti ------------------------------
+top10_pairs <- top10_unique_pairs  # <-- qui usiamo il risultato filtrato
+
+# nodo -> id coppia (1..10)
+pair_nodes <- top10_pairs %>%
+  mutate(pair_id = row_number()) %>%
+  select(pair_id, node_i, node_j) %>%
+  pivot_longer(
+    cols      = c(node_i, node_j),
+    names_to  = "role",
+    values_to = "name"
+  ) %>%
+  distinct(name, pair_id)
+
+# creo un vettore: nome_nodo -> pair_id
+pair_id_lookup <- setNames(pair_nodes$pair_id, pair_nodes$name)
+
+# palette: prima coppia rosso intenso, le altre più tenui
+pair_cols <- c(
+  "#E41A1C",  # coppia 1 - rosso forte
+  "#FB6A4A",  # coppia 2
+  "#FC9272",  # coppia 3
+  "#FCBBA1",  # coppia 4
+  "#FEE0D2",  # coppia 5
+  "#377EB8",  # coppia 6 - blu medio
+  "#6BAED6",  # coppia 7
+  "#9ECAE1",  # coppia 8
+  "#C6DBEF",  # coppia 9
+  "#EFF3FF"   # coppia 10 - azzurrino chiarissimo
+)
+
+# 1) Tieni solo i nodi con almeno un arco (niente isolati) -----------
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(
+    deg     = centrality_degree(),
+    pair_id = pair_id_lookup[name] |> as.integer()  # NA se non è in nessuna coppia
+  ) %>%
+  filter(deg > 0) %>%
+  mutate(pair_id = factor(pair_id))
+
+# 2) Visualizzazione --------------------------------------------------
+g_main %>%
+  ggraph(layout = "kk") +  # Kamada–Kawai: ben “spalmato”
+  
+  # Archi: tutti grigi
+  geom_edge_link(
+    colour      = "grey80",
+    alpha       = 0.4,
+    width       = 0.8,
+    show.legend = FALSE
+  ) +
+  
+  # Nodi: neri di base, colorati per le 10 coppie top (tutte con nodi diversi)
+  geom_node_point(
+    aes(color = pair_id),
+    size = 3
+  ) +
+  scale_color_manual(
+    values   = pair_cols,
+    na.value = "black",   # nodi fuori dalle 10 coppie: neri
+    guide    = "none"
+  ) +
+  
+  # Etichette
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+  
+  theme_graph() +
+  ggtitle("Coppie di persone coinvolte con maggiore similarità ")
+
+
+
+```
+
+
+# 2 Scopri celle terroristiche tramite il clustering e similarità
+
+Il clustering è una tecnica che permette di estrarre sottogruppi di nodi con una forte densità di archi tra loro,  
+**partizionare** nel modo giusto la rete quindi porterebbe ad avere un elevata **modularità**.  
+  
+Effettuare una partizione del grafo al **massimo del efficienza** è impossibile : **problema NP-Hard**,  
+esistono diversi algoritmi per effettuare il clustering, che sfruttano **euristiche** per avere un buon risultato.  
+
+### Applicare il clustering gerarchico per trovare cellule terroristiche
+
+Una di queste tecniche è il clustering gerarchio, che sfrutta una **misura di distanza**,  
+in generale un qualsiasi valore che indica la vicinanza tra 2 nodi, **minore è la distanza, più vicini sono i nodi**  
+  
+  
+Noi useremo come base **la similarità coseno sim(i,j)**, e la distanza sarà \( d(i,j)=1-\text{sim}(i,j) \)   
+(cioè all avvicinarsi a 1, cioè similarità massima, la distanza si ridurrà verso 0)  
+  
+    
+L'algoritmo : 
+
+- Tutti i nodi inzialmente vengono messi in **cluster singoli** 
+- A ogni passo : viene calcolata la **similarità tra cluster** tra tutte le coppie di cluster presenti
+- I 2 cluster con similarità tra cluster **maggiore** viene unita , e si **ricalcolano** tutte le nuove similarità tra cluster
+
+**Similarità tra cluster** (3 modi di calcolarla) : 
+  
+---
+
+### 🔵 **Single-link**
+
+\[
+\text{Sim}_{CL}(C_1, C_2)
+=
+\max_{i \in C_1,\; j \in C_2} \text{sim}(i,j)
+\]
+
+La similarità tra due cluster è determinata dalla **coppia più simile**.
+
+**Equivalente in termini di distanza** :
+
+\[
+d_{CL}(C_1, C_2)
+=
+\min_{i \in C_1,\; j \in C_2} d(i,j)
+\]
+
+cioè la **distanza minima**, che corrisponde alla **massima similarità**.
+
+---
+
+### 🔴 **Complete-link**
+
+\[
+\text{Sim}_{CL}(C_1, C_2)
+=
+\min_{i \in C_1,\; j \in C_2} \text{sim}(i,j)
+\]
+
+La similarità tra due cluster è determintata dalla **coppia meno simile** tra essi.
+
+**Equivalente in termini di distanza**:
+
+\[
+d_{CL}(C_1, C_2)
+=
+\max_{i \in C_1,\; j \in C_2} d(i,j)
+
+
+cioè la **distanza massima**, che corrisponde alla **minima similarità**.
+
+---
+
+### 🟠 **Average-link**
+
+\[
+\text{Sim}_{CL}(C_1, C_2)
+=
+\frac{1}{|C_1|\,|C_2|}
+\sum_{i \in C_1}
+\sum_{j \in C_2}
+\text{sim}(i,j)
+\]
+
+La similarità tra due cluster è la **media** delle similarità tra tutte le coppie di nodi.
+
+**Equivalente in termini di distanza**:
+
+\[
+d_{CL}(C_1, C_2)
+=
+1 -
+\frac{1}{|C_1|\,|C_2|}
+\sum_{i \in C_1}
+\sum_{j \in C_2}
+\text{sim}(i,j)
+\]
+
+cioè **1 - media delle similarità**.
+
+---
+
+```{r , message=FALSE, warning=FALSE}
+
+# Applico il clustering gerarchico
+
+g_ig <- as.igraph(g)  # mi servono funzioni di base di igraph, come la matrice di adiacenza
+A <- as_adjacency_matrix(g_ig, sparse = FALSE)
+
+
+#------------------------------------------
+
+# Calcolo la similarità coseno di ogni coppia di nodi
+
+cosine_similarity_mat <- function(A, mode = c("col", "row")) {
+  mode <- match.arg(mode)
+  if (mode == "row") A <- t(A)
+  
+  euclidean <- function(x) sqrt(sum(x * x)) # NORMA EUCLIDEA = somma elementi xi^2 del vettore x, e radice quadrata
+  
+  d <- apply(A, 2, euclidean)               # calcola la norma per ogni vettore colonna colonna, d vettore delle norme
+  d[d == 0] <- 1
+  
+  D <- diag(1 / d)                          # matrice diagonale, ogni elemento è l'inversa della norma 1/||xi|| di quella colonna
+  S <- D %*% t(A) %*% A %*% D               # S = Matrice di similarità  Sij, è la similarità coseno sim(i,j)  - ovviamente simmetrica
+  
+  node_names <- V(g_ig)$name
+  rownames(S) <- node_names
+  colnames(S) <- node_names
+  
+  S
+}
+
+S_cos <- cosine_similarity_mat(A, mode = "col")  # matrice di similarità
+
+#--------------------------------
+
+# Nel clustering gerarchico, viene usata una misura di distanza d(i,j) = 1 - cos(i,j)
+# costruiamo la matrice delle distanze
+
+d_cos <- as.dist(1 - S_cos)
+
+
+# CALCOLIAMO IL CLUSTERING GERARCHICO
+# in base alle distanze, con il metodo complete-link
+
+hc_cos_complete <- hclust(d_cos, method = "complete")
+
+# Applichiamo alla visualizzazione il cut del dendrogramma quando vengono creati 18 clusters
+
+k_clusters = 18 
+
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=9, fig.align='center'}
+
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(scales)
+library(igraph)
+
+set.seed(123)
+options(repr.plot.width = 14, repr.plot.height = 10)
+
+## 1) Taglio il dendrogramma in k cluster ------------------------------
+cluster_vec <- cutree(hc_cos_complete, k = k_clusters)   # named vector: names = nodi
+
+# vettore nome_nodo -> cluster_id
+cluster_lookup <- setNames(cluster_vec, names(cluster_vec))
+
+## 2) Costruisco il grafo principale (senza nodi isolati) e aggiungo il cluster
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(
+    deg     = centrality_degree(),
+    cluster = cluster_lookup[name]   # NA se il nodo non è presente in hc
+  ) %>%
+  filter(deg > 0) %>%                # rimuovo eventuali isolati
+  mutate(cluster = factor(cluster))  # per colori discreti
+
+## 3) Palette con un colore per ogni cluster ---------------------------
+n_clusters <- n_distinct(g_main %>% activate(nodes) %>% as_tibble() %>% pull(cluster))
+my_cols    <- scales::hue_pal()(n_clusters)  # genera n_clusters colori diversi
+
+## 4) Visualizzazione del grafo con i cluster colorati -----------------
+g_main %>%
+  ggraph(layout = "kk") +  # Kamada–Kawai: layout ben “spalmato”
+  
+  # Archi tutti uguali (non colorati per peso)
+  geom_edge_link(
+    colour      = "grey80",
+    alpha       = 0.4,
+    width       = 0.8,
+    show.legend = FALSE
+  ) +
+  
+  # Nodi colorati per cluster, pallini un po' più grandi
+  geom_node_point(
+    aes(color = cluster),
+    size = 4
+  ) +
+  scale_color_manual(
+    values = my_cols,
+    name   = "cluster"
+  ) +
+  
+  # Etichette (se sono troppe puoi ridurre size o toglierle)
+  geom_node_text(
+    aes(label = name),
+    repel = TRUE,
+    size  = 3
+  ) +
+  
+  theme_graph() +
+  ggtitle("Cluster attentatori ")
+
+```
+
+
+###  Interpretazione dei cluster individuati
+
+Avendo utilizzato la **similarità coseno** come misura di vicinanza tra due nodi, è del tutto normale osservare che alcuni individui non siano direttamente collegati tra loro ma vengano comunque assegnati allo stesso cluster.  
+Questo accade perché il clustering non raggruppa in base alla distanza fisica nel grafo, ma in base alla **similarità dei loro pattern di connessioni**:  
+se due soggetti condividono molti vicini in comune, la loro similarità coseno risulta elevata e vengono quindi aggregati nella stessa cellula, anche se non sono reciprocamente collegati.
+
+---
+
+### Analisi delle cellule terroristiche identificate
+
+Dall’analisi risultano visibili alcune cellule principali:
+
+- **Cluster 5**  
+  È una delle cellule più evidenti. È composta principalmente da **membri di origine spagnola**, che sembrano fare riferimento a figure chiave di collegamento.  
+  In particolare emerge il ruolo di **Semaan Gaby Eid** come vero e proprio **intermediario**, ponte tra i membri spagnoli e il resto della rete.
+
+- **Cluster 1 (rosso)**  
+  È la cellula più grande e densa, contenente il maggior numero di individui coinvolti.  
+  Rappresenta il nucleo centrale della rete, caratterizzato da forte interconnessione interna.
+
+---
+
+### Gruppi minori e nodi periferici
+
+Si identificano inoltre alcuni cluster più piccoli:
+
+- **Cluster 4 e Cluster 8**  
+  Appaiono come gruppi secondari, marginali rispetto al nucleo centrale. Sono probabilmente sottogruppi locali o cellule operative minori.
+
+- **Cluster 16, 17 e 18**  
+  Questi gruppi presentano uno o pochissimi membri e sono caratterizzati da bassa connettività.  
+  Si configurano come **“lupi solitari”**, soggetti che hanno poche relazioni dirette ma risultano comunque simili (per pattern di connessioni) a un particolare gruppo.
+
+
+
