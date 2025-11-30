@@ -1,0 +1,563 @@
+---
+title: "ProgettoTerroristiCatanzaro2"
+output: html_document
+date: "2025-11-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduzione
+
+L’Università di Barcellona, ha creato una rete con i collegamenti fra gli individui coinvolti negli attentati ai treni pendolari a Madrid 11 marzo 2004. (fonti El Pais e El Mundo, giornali spagnoli)  
+
+I nodi sono i possibili attentatori o persone che hanno aiutato nella preparazione del attentato (**individui coinvolti**),  
+il legame può essere di diverso tipo :  
+- fiducia amicizia   
+- legami con Al Quaeda e Osama Bin Laden  
+- Co-partecipazione in campi di addestramento/guerre  
+- Co-partecipazione in altri attacchi terroristici    
+**Grafo indiretto**, i legami valgono in entrambe le direzioni  
+  
+  
+Il **peso dell arco** corrisponde alla forza del legame da 1 a 4.
+
+
+```{r include=FALSE}
+
+library(tidyverse)
+library(tidygraph)
+library(ggraph)
+library(scales)
+library(corrplot)
+
+
+
+```
+
+
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+nodes <- read_csv("names.csv", show_col_types = FALSE)
+ties  <- read_csv("edges.csv",  show_col_types = FALSE)
+
+
+# Se la colonna dei nodi si chiama "id" e in ties "from"/"to" contengono gli stessi ID:
+g <- tbl_graph(
+  nodes   = nodes,
+  edges   = ties,
+  directed = FALSE,
+  node_key = "id"   # chiave che collega edges$from / edges$to a nodes$id
+)
+
+#g
+
+
+# MOSTRARE I DF DEI NODI E DEGLI ARCHI
+
+g %>% activate(nodes) %>% as_tibble() %>% head()
+g %>% activate(edges) %>% as_tibble() %>% head()
+
+
+
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=9, fig.align='center'}
+
+set.seed(123)
+options(repr.plot.width = 14, repr.plot.height = 10)
+
+# 1) Tieni solo i nodi con almeno un arco (niente isolati)
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(deg = centrality_degree()) %>%
+  filter(deg > 0)          # rimuove i completamente isolati
+
+# 2) Visualizzazione del componente principale, molto più espanso
+g_main %>%
+  ggraph(layout = "kk") +  # Kamada–Kawai: ben “spalmato”
+  
+  # Archi colorati per intensità del legame
+  geom_edge_link(
+    aes(
+      colour = weight,
+      alpha  = rescale(weight)
+    ),
+    width       = 0.9,
+    show.legend = TRUE
+  ) +
+  scale_edge_colour_gradient(
+    low  = "grey80",
+    high = "red3",
+    name = "Tie strength"
+  ) +
+  scale_edge_alpha(range = c(0.30, 0.90), guide = "none") +
+  
+  # Nodi
+  geom_node_point(size = 3, colour = "black") +
+  
+  # Etichette
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+  
+  theme_graph() +
+  ggtitle("Rete persone coinvolte negli attentati")
+
+```
+
+Abbiamo una serie di **Legami molto forti** tra diverse coppie di terroristi centrali nella rete,  
+mentre meno forti per più marginali nel grafo.
+
+## 1. Usare le k-componenti per gruppi coesi di terroristi.
+
+### Componenti connesse e k-componenti
+
+Una **componente connessa** di un grafo è un **insieme di nodi** tale che  
+per **ogni coppia di nodi** dell’insieme esiste almeno **un cammino indiretto** (senza guardare la direzione del arco) che li collega all’interno del grafo.  
+
+Un grafo si dice **connesso** se possiede **una sola componente connessa gigante**, cioè se non esistono nodi o gruppi di nodi isolati rispetto al resto della rete.
+
+---
+
+Un **cammino** da un nodo \(a\) a un nodo \(b\) è una **sequenza di archi consecutivi**
+\[
+(a, v_1),\ (v_1, v_2),\ \dots,\ (v_{k-1}, b)
+\]
+in cui l’estremo di ogni arco coincide con l’estremo iniziale del successivo.
+
+Due (o più) cammini da \(a\) a \(b\) sono detti **cammini indipendenti :**   se **non condividono alcun nodo durante il percorso**, apparte il nodo iniziale a e il nodo finale b .
+
+---
+
+Una **k-componente connessa** è un **insieme di nodi** del grafo tale che,    
+per **ogni coppia di nodi** dell’insieme, esistono **almeno \(k\) cammini indiretti indipendenti ** che li collegano.  
+
+
+
+#### Esempio bicomponente
+
+
+Tra ogni coppia di nodi esistono **almeno 2 cammini indipendenti**.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}
+library(igraph)
+
+# creo un ciclo di 4 nodi: 1-2-3-4-1
+g_cycle4 <- make_ring(4)
+
+# plot molto semplice
+plot(
+  g_cycle4,
+  layout = layout_in_circle(g_cycle4),
+  vertex.size = 25,
+  vertex.label.cex = 1.4,
+  main = "Ciclo di 4 nodi (bicomponente connessa)"
+)
+
+```
+
+### Ricerchiamo le k-componenti del grafo
+
+#### Estraiamo la Bicomponente più grande nel grafo
+
+```{r bicomponenti_giant, echo=TRUE, message=FALSE, warning=FALSE,fig.width=10, fig.height=9, fig.align='center'}
+
+library(tidygraph)
+library(ggraph)
+library(igraph)
+
+set.seed(123)
+
+# Estraggo i nodi già isolati, tanto so che non faranno della componente connessa
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(deg = centrality_degree()) %>%    # grado != 0
+  filter(deg > 0)
+
+
+g_igr <- as.igraph(g_main) # uso formule base di igraph
+
+# CALCOLO TUTTE LE BICOMPONENTI PRESENTI NEL GRAFO
+bc    <- biconnected_components(g_igr)
+bcn   <- bc$components                   # matrice dei nodi x bicomponente (nodi appartente a ogni componente)
+bsz   <- lengths(bcn)                    # vettore dimensione bicomponente (grandezza di ogni bicomponente)
+
+# ESTRAGGO DA bsz LA BICOMPONENTE CON DIMENSIONE MAGGIORE (numero maggiore di nodi)
+giant_id      <- which.max(bsz)   # trovo l'id
+giant_members <- bcn[[giant_id]]  # estraggo il vettore dei i nodi appartenti quella bicomponente 
+
+
+# DIFFERENZIO I NODI DENTRO LA MACRO BICOMPONENTE, DA QUELLI FUORI 
+group <- rep("Fuori bicomponente", vcount(g_igr))
+group[giant_members] <- "Bicomponente maggiore"
+
+g_bc <- g_main %>%
+  activate(nodes) %>%
+  mutate(                        # aggiungo un attributo a ogni nodo in base se fanno parte del group
+    bicomp = factor(group,
+                    levels = c("Fuori bicomponente", "Bicomponente maggiore"))
+  )
+
+# -----------------------------------------------------
+
+# VISUALIZZO IL GRAFO
+
+# coloro di blu i nodi con attributo "Bicomponente maggiore"
+
+
+g_bc %>%
+  ggraph(layout = "kk") +
+
+  
+  geom_edge_link(
+    colour = "grey60",
+    alpha  = 0.2,
+    width  = 0.9,
+    show.legend = FALSE
+  ) +
+
+  geom_node_point(aes(color = bicomp), size = 3) +
+
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+
+  scale_color_manual(
+    values = c("Fuori bicomponente"    = "grey60",
+               "Bicomponente maggiore" = "dodgerblue3"),
+    name   = "Bicomponente"
+  ) +
+
+  theme_graph() +
+  ggtitle("Bicomponente maggiore (cella terroristica principale)")
+
+
+```
+
+### Interpretazione della bicomponente principale
+
+Osserviamo che i nodi (o i piccoli gruppi di nodi) **periferici** (più esterni al grafo),   
+cioè collegati al resto della rete tramite **un solo nodo di entrata**,  
+**non possono far parte della bicomponente principale centrale**.
+
+Infatti, per definizione, in una **bicomponente** tra **ogni coppia di nodi** devono
+esistere **almeno due cammini indipendenti**  
+(ossia cammini che non condividono nodi, apparte gli estremi del cammino)
+
+Nel caso di un **nodo periferico** collegato alla rete tramite un unico nodo:  
+Qualunque cammino che lo collega agli altri nodi del grafo deve necessariamente passare per **lo stesso nodo di “ingresso”**.  
+Non esistono 2 cammini che non passano per quel nodo, quindi **non esistono due cammini indipendenti** che partono/arrivano da quei nodi marginali.
+
+Un esempio evidente è il triangolo esterno  
+**Mohamed Almallah – Moutaz Almallah – Mohamed El Egipcio**:
+
+- i due fratelli **Mohamed** e **Moutaz Almallah** **non** fanno parte della
+  bicomponente principale,
+- perché tutti i cammini che li collegano al resto della rete
+  passano obbligatoriamente da **Mohamed El Egipcio**,
+- ripetendo lo stesso nodo interno, i cammini **non sono indipendenti**.
+
+---
+
+### Significato pratico delle k-componenti
+
+Le **k-componenti** sono un vero e proprio **indice di robustezza e coesione** del grafo:
+
+- i fratelli **Almallah**, per essere connessi al resto della rete, **dipendono da un unico nodo**, **Mohamed El Egipcio**;
+- se questo nodo viene meno (arresto, morte, cambiamento di ruolo, ecc.),  
+i fratelli vengono **immediatamente isolati** dalla componente connessa principale.
+
+In generale:
+
+- tutti i nodi che **non appartengono** alla bicomponente principale risultano **marginali / emarginati** rispetto alla struttura centrale.
+- questi nodi sono **più vulnerabili**: è relativamente più facile **“tagliarli fuori”**, rimuovendo uno o pochissimi **nodi chiave**;
+- al contrario, i nodi interni alla **bicomponente maggiore** sono legati da più cammini indipendenti, e per isolarli occorrerebbe **rimuovere un maggior numero di nodi**: la loro cellula è quindi **più coesa e più robusta**.
+
+
+### Osserviamo altre k-componenti principali,
+Per arrivare a qual'è la macro k-componente connessa più forte
+
+#### 3-Componente
+Verranno esclusi gruppi di nodi con **solo 2 nodi di ingresso**,  
+Il gruppo più evidente è quello degli spagnoli, "Toro, Lamo, Granados, Perez ...",   che avevano solo 2 contatti principali con la rete, cioè "Gaby edi" e "Ouled Akcha".
+
+```{r k3_component, echo=FALSE, message=FALSE, warning=FALSE,fig.width=10, fig.height=9, fig.align='center'}
+
+library(tidygraph)
+library(ggraph)
+library(igraph)
+
+set.seed(123)
+
+# 1) come prima: togliamo i nodi isolati
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(deg = centrality_degree()) %>%
+  filter(deg > 0)
+
+g_igr <- as.igraph(g_main)
+
+# 2) k-componenti tramite cohesive_blocks (può essere un po' pesante)
+b  <- cohesive_blocks(g_igr)   # struttura dei blocchi coesivi
+bn <- blocks(b)               # lista: nodi di ogni blocco
+ck <- cohesion(b)             # coesione (k) di ciascun blocco
+
+# 3) seleziona solo i blocchi con k >= 3 e scegli il più grande
+idx3 <- which(ck >= 3)
+
+if (length(idx3) > 0) {
+  # dimensione di ciascun blocco con k >= 3
+  sizes3   <- lengths(bn[idx3])
+  best3_id <- idx3[ which.max(sizes3) ]
+  nodes3   <- bn[[best3_id]]          # nodi della 3-componente maggiore
+} else {
+  nodes3 <- integer(0)                # nessuna 3-componente trovata
+}
+
+# 4) etichette: dentro / fuori 3-componente
+group3 <- rep("Fuori 3-componente", vcount(g_igr))
+if (length(nodes3) > 0) {
+  group3[nodes3] <- "3-componente maggiore"
+}
+
+g_k3 <- g_main %>%
+  activate(nodes) %>%
+  mutate(
+    k3_comp = factor(group3,
+                     levels = c("Fuori 3-componente", "3-componente maggiore"))
+  )
+
+# 5) Visualizzazione: stesso stile del grafo precedente
+g_k3 %>%
+  ggraph(layout = "kk") +
+
+  # Archi: tutti grigi, alpha fisso
+  geom_edge_link(
+    colour = "grey60",
+    alpha  = 0.2,
+    width  = 0.9,
+    show.legend = FALSE
+  ) +
+
+  # Nodi: blu = 3-componente maggiore, grigio = fuori
+  geom_node_point(aes(color = k3_comp), size = 3) +
+
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+
+  scale_color_manual(
+    values = c("Fuori 3-componente"    = "grey60",
+               "3-componente maggiore" = "dodgerblue3"),
+    name   = "3-componente"
+  ) +
+
+  theme_graph() +
+  ggtitle("3-componente maggiore")
+
+```
+
+#### 4-Componente 
+
+Che rimane comunque simile a quella precedente,  
+la componente centrale è **molto densa di archi**, dovrei arrivare **k molto alti** per ridurla ulteriormente.
+
+```{r k4_component, echo=FALSE, message=FALSE, warning=FALSE,fig.width=10, fig.height=9, fig.align='center'}
+
+library(tidygraph)
+library(ggraph)
+library(igraph)
+
+set.seed(123)
+
+# 1) come prima: togliamo i nodi isolati
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(deg = centrality_degree()) %>%
+  filter(deg > 0)
+
+g_igr <- as.igraph(g_main)
+
+# 2) blocchi coesivi (se li hai già calcolati prima puoi riusare 'b')
+b  <- cohesive_blocks(g_igr)
+bn <- blocks(b)      # lista nodi per blocco
+ck <- cohesion(b)    # coesione k di ogni blocco
+
+# 3) seleziona blocchi con k >= 4 e prendi il più grande
+idx4 <- which(ck >= 4)
+
+if (length(idx4) > 0) {
+  sizes4   <- lengths(bn[idx4])
+  best4_id <- idx4[ which.max(sizes4) ]
+  nodes4   <- bn[[best4_id]]          # nodi della 4-componente maggiore
+} else {
+  nodes4 <- integer(0)                # nessuna 4-componente trovata
+}
+
+# 4) etichette: dentro / fuori 4-componente
+group4 <- rep("Fuori 4-componente", vcount(g_igr))
+if (length(nodes4) > 0) {
+  group4[nodes4] <- "4-componente maggiore"
+}
+
+g_k4 <- g_main %>%
+  activate(nodes) %>%
+  mutate(
+    k4_comp = factor(group4,
+                     levels = c("Fuori 4-componente", "4-componente maggiore"))
+  )
+
+# 5) Visualizzazione: stesso stile degli altri grafi
+g_k4 %>%
+  ggraph(layout = "kk") +
+
+  # Archi: tutti grigi, alpha fisso
+  geom_edge_link(
+    colour = "grey60",
+    alpha  = 0.2,
+    width  = 0.9,
+    show.legend = FALSE
+  ) +
+
+  # Nodi: blu = 4-componente maggiore, grigio = fuori
+  geom_node_point(aes(color = k4_comp), size = 3) +
+
+  geom_node_text(aes(label = name), repel = TRUE, size = 3) +
+
+  scale_color_manual(
+    values = c("Fuori 4-componente"    = "grey60",
+               "4-componente maggiore" = "dodgerblue3"),
+    name   = "4-componente"
+  ) +
+
+  theme_graph() +
+  ggtitle("4-componente maggiore")
+
+```
+
+----
+
+# 2. Strategie di smantellamento della rete
+
+Nel nostro caso la rete rappresenta **una rete di terroristi**.  
+Possiamo guardarla da due punti di vista opposti:
+
+- **dal lato della rete di terroristi**, l’obiettivo è **non farsi smantellare**;
+- **dal lato della polizia**, l’obiettivo è **smantellare la rete il più rapidamente possibile**, cioè eliminare un nodo deve separare la rete il più possibile (la componente gigante della rete)
+
+I primi nodi che la polizia vorrebbe colpire sono proprio i **nodi di ingresso / ponte**,   
+quelli tramite i quali passano la maggior parte delle connessioni dei nodi periferici.
+
+#### Come li riconosciamo?  
+Per defizione la **Betweenness centrality** di un nodo: più è alta, maggiore è il **numero di cammini** che passano per il nodo.  
+Quindi sarà particolarmente alta per i **nodi ponte**, in quanto tutti i percorsi **tra la rete e i nodi marginali** passano da loro.
+
+Se la rete si frammenta più velocemente quando rimuoviamo i nodi in ordine di betweenness (come ci aspettiamo), questo significa che:
+
+- **dal punto di vista della rete**, questi individui sono quelli da proteggere maggiormente;
+- **dal punto di vista della polizia**, sono proprio questi i nodi da colpire per primi.
+
+Nel seguito confronteremo lo **smantellamento mirato** (rimozione dei nodi per betweenness decrescente)   
+con uno **smantellamento casuale**, in cui i nodi spariscono in modo random (come se la polizia non avvesse una strategia)  
+E vediamo quale è quello più veloce.
+
+```{r percolation_random_vs_betw, echo=TRUE, message=FALSE, warning=FALSE}
+library(tidygraph)
+library(igraph)
+
+# ELIMINO I NODI GIA SCONNESSI, l'obbiettivo è sconnettere la rete, non sono utili
+g_main <- g %>%
+  activate(nodes) %>%
+  mutate(deg = centrality_degree()) %>%    # grado != 0
+  filter(deg > 0)
+
+g_igr <- as.igraph(g_main)    # uso funzioni di igraph base
+
+
+
+# FUNZIONE PERCOLATE (slides)
+# dato il grafo, il numero di nodi da rimuovere e l'ordine con cui rimuovere
+# inizia a rimuovere un nodo alla volta 
+
+# !! RITORNA IL VETTORE CON LE DIMENSIONI DELLA COMPONENTE GIGANTE, PER OGNI NODO RIMOSSO
+percolate <- function(g, size, order_vec) {
+  
+  giant <- numeric(size + 1)
+  
+  c0 <- components(g)
+  giant[1] <- max(c0$csize)
+  
+  for (i in 1:size) {
+    g2 <- delete_vertices(g, order_vec[1:i])
+    c2 <- components(g2)
+    giant[i + 1] <- max(c2$csize)
+  }
+  
+  return(giant)
+}
+
+
+# RIMUOVO META' NODI DEL GRAFO, 
+size <- floor(vcount(g_igr) / 2) # abbastanza per vedere se la rete si sfalda
+
+
+# VETTORE NODI - ORDINATI RANDOMICAMENTE
+set.seed(123)
+ord_rand <- sample(vcount(g_igr))
+
+
+# VETTORE NODI - ORDINATI PER BETWEENESS
+bet_vals <- betweenness(g_igr)
+ord_bet  <- order(bet_vals, decreasing = TRUE)
+
+
+
+# APPLICO LA FUNZIONE percolate PER SUI 2 VETTORI
+rand <- percolate(g_igr, size, ord_rand)
+bet <- percolate(g_igr, size, ord_bet)
+
+# -------------------------------------------------
+
+# PLOTTO IL GRAFICO (come da slides)
+
+plot(0:size, bet, type = "l", col = 2, lwd = 2,
+     xlab = "Numero di nodi rimossi",
+     ylab = "Dimensione della componente gigante")
+
+lines(0:size, rand, col = 4, lwd = 2)
+
+legend("topright",
+       legend = c("Betweenness", "Random"),
+       col = c(2, 4), lty = 1, lwd = 2)
+
+```
+
+
+Come dedotto, la **componente gigante** si smantella più velocemente eliminando i **nodi ponte** (rosso) piuttosto che eliminandoli random. (blu)   
+
+#### Spiegazione
+
+**Random**  
+  
+
+Dato che la maggior parte dei nodi è situata nella **componente centrale densamente connessa**,  
+molti nodi scelti randomicamente, apparterranno per forza a quel gruppo, (maggiore probabilità)   
+la cui eliminazione però non comporta assolutamente **all’esclusione dalla componente gigante di ulteriori nodi**.   
+
+Di conseguenza, lo **smantellamento random è praticamente lineare** = (*elimino un nodo → la componente gigante perde un nodo*).
+
+**Betweeness**  
+  
+
+Al contrario, 
+
+Con la Betweeness si osserva già dopo solo **circa 10 nodi rimossi** che la rete diventa **fortemente instabile**:  
+rimuovendo anche solo **altri 5 nodi**, la componente gigante **collassa rapidamente in molte parti separate**,  
+di cui la più grande ha **meno di 10 nodi**.
+
+
+Eliminare i nodi in maniera **sistematica**, seguendo la strategia basata sulla **betweenness**,  
+
+porta a uno **smantellamento, quasi esponenziale**, = (*elimino un nodo → la componente gigante perde diversi nodi alla volta*).
+
