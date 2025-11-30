@@ -5,27 +5,6 @@
 Welcome to my personal laboratory of **advanced data analytics and graph science**, entirely developed in **R**.  
 This repository gathers, organizes, and continuously expands all my analyses — from **complex networks** to **real-world datasets** — combining:
 
-<p align="center">
-  <img src="sampleGraph1.PNG" width="420">
-</p>
-
-- modern **statistics** and exploratory techniques  
-- **network science** (social graphs, infrastructure graphs, weighted networks)  
-- professional **data visualization** with the tidyverse ecosystem  
-- reproducible workflows using R Markdown and `renv`
-- 
-<p align="center">
-<img src="SampleGraph2.PNG" width="420">
-</p>
-
-My goal is to build a growing, structured collection of analyses that showcase:
-- how I approach analytical problems  
-- how I prepare and transform data  
-- how I evaluate multiple metrics (centrality, power, distribution-based measures)  
-- how I communicate results with clear and insightful visualizations  
-
-This repository is meant to grow with me — every new graph, dataset or idea will find its place here.
-
 ---
 
 ## 📌 Current Projects (more to come)
@@ -42,6 +21,30 @@ This repository is meant to grow with me — every new graph, dataset or idea wi
 
 ### **👮 Terrorist Network percolation**
 
+
+---
+
+
+<p align="center">
+  <img src="sampleGraph1.PNG" width="420">
+</p>
+
+- modern **statistics** and exploratory techniques  
+- **network science** (social graphs, infrastructure graphs, weighted networks)  
+- professional **data visualization** with the tidyverse ecosystem  
+- reproducible workflows using R Markdown and `renv`
+  
+<p align="center">
+<img src="SampleGraph2.PNG" width="420">
+</p>
+
+My goal is to build a growing, structured collection of analyses that showcase:
+- how I approach analytical problems  
+- how I prepare and transform data  
+- how I evaluate multiple metrics (centrality, power, distribution-based measures)  
+- how I communicate results with clear and insightful visualizations  
+
+This repository is meant to grow with me — every new graph, dataset or idea will find its place here.
 
 
 ---
