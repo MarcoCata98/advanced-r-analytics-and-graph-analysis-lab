@@ -30,25 +30,18 @@ This repository is meant to grow with me — every new graph, dataset or idea wi
 
 ## 📌 Current Projects (more to come)
 
-### **🐬 Dolphin Social Network (Network Science)**
-Analysis of the well-known *Dolphin Association Network*. Includes:
-- centrality measures comparison  
-- visualization of communities & structure  
-- exploration of key hubs and peripheral nodes  
+### **🎮 Game Elo Analysis**
+
+### **🐬 Dolphin Social Network** 
 
 ### **🔌 European Gas Pipeline Network**
-Exploration of a large-scale **infrastructure graph**:
-- identification of European hubs (e.g., DE)  
-- shortest paths & neighborhood layers  
-- power metrics (Bonacich power, β-power)  
-- multi-layer visual styles with `ggraph`  
 
-### 📚 Citation Flow Between Scientific Disciplines (Network Science)
+### **📚 Citation Flow Between Scientific Disciplines**
 
-Analysis of a directed weighted network describing citation flows across 30 scientific disciplines.  
-The project includes construction of the flow network, visualization of major citation patterns, and identification of self-citing, most-cited, and most-citing fields.  
-Advanced normalization techniques (expected flow, F/E ratio, X-test) and Rao quadratic entropy are used to highlight interdisciplinary disciplines.  
-A complete workflow combining network construction, metrics, statistical tests, and interpretable visualizations.
+### **💣 Terrorist hierarchical clustering**
+
+### **👮 Terrorist Network percolation**
+
 
 
 ---
